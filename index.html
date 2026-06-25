@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1a6fd4">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="風量測定">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%231a6fd4'/%3E%3Ctext x='90' y='122' font-size='80' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'%3EQ%3C/text%3E%3C/svg%3E">
+<title>風量測定 Q値確認ツール</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+:root{
+  --bg:#f0f4f9;
+  --card:#ffffff;
+  --ink:#1a2535;
+  --muted:#5a6a82;
+  --line:#dce4ef;
+  --blue:#1a6fd4;
+  --blue-d:#1457ab;
+  --blue-lt:#e8f0fc;
+  --green:#1a9950;
+  --amber:#c07a10;
+  --red:#cc3c3c;
+  --floor:#e67e22;
+  --ceil:#8e44ad;
+  --wall:#16a085;
+  --fan:#2980b9;
+  --shadow:0 1px 3px rgba(15,35,70,.07),0 4px 18px rgba(15,35,70,.05);
+  --radius:16px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+html{font-size:16px;-webkit-text-size-adjust:100%}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Segoe UI",Meiryo,system-ui,sans-serif;
+  line-height:1.6;
+  padding-top:env(safe-area-inset-top);
+  padding-bottom:calc(env(safe-area-inset-bottom) + 48px);
+}
+.app{max-width:560px;margin:0 auto;padding:0 14px}
+header.top{text-align:center;padding:20px 12px 16px}
+.top-ic{
+  width:56px;height:56px;border-radius:16px;
+  background:linear-gradient(140deg,#1a6fd4,#0e4fa0);
+  color:#fff;font-size:28px;font-weight:900;line-height:56px;
+  display:inline-block;box-shadow:var(--shadow);letter-spacing:-.02em;
+}
+header.top h1{font-size:20px;margin:10px 0 3px;font-weight:800}
+header.top p{color:var(--muted);font-size:12.5px}
+.card{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius);box-shadow:var(--shadow);
+  padding:16px 14px;margin:12px 0;
+}
+.card-hd{
+  display:flex;align-items:center;gap:8px;
+  font-size:14px;font-weight:700;margin-bottom:14px;
+}
+.card-hd .bar{width:4px;height:18px;border-radius:3px;flex-shrink:0}
+.bar-floor{background:var(--floor)}
+.bar-ceil{background:var(--ceil)}
+.bar-wall{background:var(--wall)}
+.bar-fan{background:var(--fan)}
+.bar-design{background:var(--blue)}
+.bar-info{background:#7f8c9a}
+label.field{display:block;margin-bottom:12px}
+.lab{display:block;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:4px}
+.lab small{font-weight:400}
+input[type="number"],input[type="text"]{
+  width:100%;font-size:16px;padding:11px 12px;
+  border:1.5px solid var(--line);border-radius:11px;
+  background:#fafcff;color:var(--ink);font-family:inherit;
+  -webkit-appearance:none;
+}
+input:focus{outline:none;border-color:var(--blue);background:#fff}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.unit-row{display:flex;align-items:center;gap:8px}
+.unit-row input{flex:1}
+.unit{font-size:13px;color:var(--muted);min-width:44px;flex-shrink:0}
+.count-row{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.count-row .lab2{font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap}
+.count-inp{
+  width:80px;font-size:18px;padding:9px 10px;
+  border:1.5px solid var(--line);border-radius:11px;
+  background:#fafcff;color:var(--ink);font-family:inherit;text-align:center;
+  -webkit-appearance:none;
+}
+.count-inp:focus{outline:none;border-color:var(--blue)}
+.count-note{font-size:12px;color:var(--muted)}
+.gari-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.gari{width:100%;border-collapse:collapse;min-width:280px}
+table.gari th{
+  font-size:11.5px;color:var(--muted);font-weight:600;
+  padding:0 5px 8px;text-align:right;white-space:nowrap;
+}
+table.gari th:first-child{text-align:center;width:28px}
+table.gari td{padding:0 3px 8px;vertical-align:middle}
+table.gari td:first-child{text-align:center;color:var(--muted);font-size:13px;font-weight:700}
+table.gari input[type="number"]{font-size:15px;padding:9px 8px;text-align:right}
+tr.loc-row td{padding:0 3px 10px}
+tr.loc-row td:first-child{border-bottom:1.5px dashed var(--line)}
+tr.loc-row .loc-cell{padding-bottom:10px;border-bottom:1.5px dashed var(--line)}
+table.gari input[type="text"].loc-inp{
+  font-size:13px;padding:7px 9px;color:var(--ink);
+  border-color:#e2eaf5;background:#f5f8fc;border-radius:8px;
+}
+table.gari input[type="text"].loc-inp:focus{border-color:var(--blue);background:#fff}
+table.gari input[type="text"].loc-inp::placeholder{color:#a0adc0}
+.loc-label{
+  font-size:11px;color:var(--muted);font-weight:600;
+  white-space:nowrap;padding-right:4px;line-height:36px;
+}
+.detail-wrap{margin-top:10px}
+.detail-toggle{
+  width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:10px;
+  background:#f7f9fc;color:var(--blue-d);font-size:13px;font-weight:700;
+  cursor:pointer;text-align:left;display:flex;align-items:center;justify-content:space-between;
+}
+.detail-toggle:active{background:var(--blue-lt)}
+.detail-body{display:none;margin-top:8px}
+.detail-body.open{display:block}
+table.detail{width:100%;border-collapse:collapse;font-size:13px}
+table.detail th{
+  font-size:11px;color:var(--muted);font-weight:600;
+  padding:0 6px 6px;border-bottom:1px solid var(--line);text-align:right;
+}
+table.detail th:first-child{text-align:center;width:28px}
+table.detail th.loc-th{text-align:left}
+table.detail td{padding:6px 6px;border-bottom:1px solid #f0f4f9;text-align:right;vertical-align:middle}
+table.detail td:first-child{text-align:center;color:var(--muted);font-weight:700}
+table.detail td.loc-td{text-align:left;color:var(--ink);font-size:12px;max-width:120px;word-break:break-all}
+table.detail td.loc-td.empty{color:#b0bac8;font-style:italic}
+.total-row td{
+  padding-top:6px;border-top:1px solid var(--line);
+  font-size:13px;color:var(--muted);font-weight:600;
+}
+.total-row td:last-child,.total-row td:nth-child(2){
+  color:var(--ink);font-weight:700;font-size:15px;
+}
+.no-data{font-size:13px;color:var(--muted);text-align:center;padding:8px 0}
+.calcbtn{
+  width:100%;padding:16px;border:none;border-radius:14px;
+  background:linear-gradient(135deg,#1a6fd4,#0e4fa0);
+  color:#fff;font-size:17px;font-weight:800;cursor:pointer;
+  box-shadow:var(--shadow);margin-top:4px;letter-spacing:.03em;
+}
+.calcbtn:active{transform:translateY(1px);opacity:.92}
+.err{
+  background:#fdeded;border:1px solid #f3bcbc;color:#b02a2a;
+  border-radius:12px;padding:10px 13px;font-size:13.5px;margin:8px 0;display:none;
+}
+.err.show{display:block}
+#results{display:none}
+#results.show{display:block}
+.result-card{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius);box-shadow:var(--shadow);
+  padding:16px 14px;margin:12px 0;
+}
+.result-hd{
+  display:flex;align-items:center;gap:8px;
+  font-size:13px;font-weight:700;margin-bottom:12px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.04em;
+}
+.summary-block{
+  background:var(--blue-lt);border:1.5px solid #b8d0f5;
+  border-radius:14px;padding:14px 16px;margin-bottom:12px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+}
+.summary-block .label{font-size:12px;color:var(--blue-d);font-weight:700}
+.summary-block .value{font-size:28px;font-weight:800;color:var(--blue-d);line-height:1}
+.summary-block .unit-s{font-size:13px;font-weight:500;color:var(--muted);margin-left:3px}
+table.res{width:100%;border-collapse:collapse}
+table.res th{
+  font-size:11.5px;color:var(--muted);font-weight:600;
+  padding:0 8px 7px;text-align:right;border-bottom:1px solid var(--line);
+}
+table.res th:first-child{text-align:left}
+table.res td{
+  font-size:14px;padding:7px 8px;
+  border-bottom:1px solid #f0f4f9;text-align:right;
+}
+table.res td:first-child{text-align:left;font-weight:600}
+table.res tr.subtotal td{
+  font-weight:700;font-size:15px;background:#f8fafd;
+  border-top:1.5px solid var(--line);border-bottom:1.5px solid var(--line);
+}
+table.res tr.grand td{
+  font-weight:800;font-size:16px;background:var(--blue-lt);
+  border-top:2px solid var(--blue);color:var(--blue-d);
+}
+.compare-block{margin-top:14px}
+.compare-row{margin-bottom:12px}
+.compare-label{
+  display:flex;justify-content:space-between;align-items:baseline;
+  font-size:13px;margin-bottom:5px;
+}
+.compare-label .name{font-weight:700}
+.compare-label .pct{font-size:17px;font-weight:800}
+.pct-green{color:var(--green)}
+.pct-amber{color:var(--amber)}
+.pct-red{color:var(--red)}
+.bar-bg{height:12px;background:#e8ecf3;border-radius:99px;overflow:hidden}
+.bar-fill{height:100%;border-radius:99px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+.bar-fill-fan{background:linear-gradient(90deg,#2980b9,#1a6fd4)}
+.bar-fill-gari{background:linear-gradient(90deg,#16a085,#1a9950)}
+.badge{
+  display:inline-block;font-size:11px;font-weight:700;
+  padding:2px 8px;border-radius:999px;margin-left:6px;vertical-align:middle;
+}
+.badge-ok{background:#e2f5ec;color:var(--green)}
+.badge-warn{background:#fdf3e0;color:var(--amber)}
+.badge-ng{background:#fdeaea;color:var(--red)}
+.imgbtn{
+  width:100%;padding:14px;border:1.5px solid var(--blue);
+  border-radius:14px;background:#fff;
+  color:var(--blue-d);font-size:15px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;margin-top:6px;
+}
+.imgbtn:active{background:var(--blue-lt)}
+#capture-target{
+  background:var(--bg);padding:12px;border-radius:var(--radius);
+}
+.cap-header{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;background:var(--blue-d);
+  border-radius:12px 12px 0 0;margin:-12px -12px 12px;
+  color:#fff;
+}
+.cap-header .ic{
+  width:36px;height:36px;border-radius:10px;
+  background:rgba(255,255,255,.2);
+  font-size:20px;font-weight:900;line-height:36px;
+  text-align:center;
+}
+.cap-header .title-s{font-size:15px;font-weight:800}
+.cap-header .sub-s{font-size:11px;opacity:.8}
+.cap-info{
+  font-size:12px;color:var(--muted);
+  display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;
+  padding:8px 12px;background:#f7f9fc;border-radius:9px;
+}
+.cap-info span b{color:var(--ink)}
+.modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);
+  z-index:9999;align-items:center;justify-content:center;padding:20px;
+}
+.modal-overlay.show{display:flex}
+.modal-box{
+  background:#fff;border-radius:20px;overflow:hidden;
+  max-width:480px;width:100%;max-height:90vh;
+  display:flex;flex-direction:column;
+}
+.modal-top{
+  padding:14px 16px;background:var(--blue-d);color:#fff;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.modal-top span{font-size:14px;font-weight:700}
+.modal-close{
+  width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.2);
+  border:none;color:#fff;font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
+.modal-body{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px}
+.modal-body img{width:100%;border-radius:12px;display:block}
+.modal-note{
+  font-size:12px;color:var(--muted);text-align:center;
+  padding:10px 14px;background:#f7f9fc;
+}
+footer{text-align:center;color:var(--muted);font-size:11.5px;margin-top:20px;line-height:1.8}
+.loading-overlay{
+  display:none;position:fixed;inset:0;background:rgba(255,255,255,.85);
+  z-index:9998;align-items:center;justify-content:center;flex-direction:column;gap:12px;
+}
+.loading-overlay.show{display:flex}
+.spinner{
+  width:40px;height:40px;border:4px solid var(--line);
+  border-top-color:var(--blue);border-radius:50%;
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top">
+  <div class="top-ic">Q</div>
+  <h1>風量測定 Q値確認</h1>
+  <p>吹き出し口・ファン風量の集計と設計値比較</p>
+</header>
+<div class="card">
+  <div class="card-hd"><span class="bar bar-info"></span>物件・測定情報</div>
+  <div class="row2">
+    <label class="field">
+      <span class="lab">物件名</span>
+      <input type="text" id="site-name" placeholder="例：○○ビル3F" inputmode="text">
+    </label>
+    <label class="field">
+      <span class="lab">測定日</span>
+      <input type="text" id="meas-date" placeholder="例：2026/06/25" inputmode="text">
+    </label>
+  </div>
+  <label class="field" style="margin-bottom:0">
+    <span class="lab">備考</span>
+    <input type="text" id="memo" placeholder="系統名など" inputmode="text">
+  </label>
+</div>
+<div class="card">
+  <div class="card-hd"><span class="bar bar-design"></span>設計風量</div>
+  <label class="field" style="margin-bottom:0">
+    <span class="lab">設計風量 Q設計 <small>（系統全体）</small></span>
+    <div class="unit-row">
+      <input type="number" id="design-q" inputmode="decimal" step="1" placeholder="例：3600">
+      <span class="unit">m³/h</span>
+    </div>
+  </label>
+</div>
+<div class="card">
+  <div class="card-hd"><span class="bar bar-floor"></span>床吹き出しガラリ</div>
+  <div class="count-row">
+    <span class="lab2">台数</span>
+    <input type="number" class="count-inp" id="cnt-floor" inputmode="numeric" min="0" max="20" placeholder="0" value="">
+    <span class="count-note">台（0〜20）</span>
+  </div>
+  <div id="rows-floor"><p class="no-data">台数を入力すると測定欄が表示されます</p></div>
+</div>
+<div class="card">
+  <div class="card-hd"><span class="bar bar-ceil"></span>天井吹き出しガラリ</div>
+  <div class="count-row">
+    <span class="lab2">台数</span>
+    <input type="number" class="count-inp" id="cnt-ceil" inputmode="numeric" min="0" max="20" placeholder="0" value="">
+    <span class="count-note">台（0〜20）</span>
+  </div>
+  <div id="rows-ceil"><p class="no-data">台数を入力すると測定欄が表示されます</p></div>
+</div>
+<div class="card">
+  <div class="card-hd"><span class="bar bar-wall"></span>壁吹き出しガラリ</div>
+  <div class="count-row">
+    <span class="lab2">台数</span>
+    <input type="number" class="count-inp" id="cnt-wall" inputmode="numeric" min="0" max="20" placeholder="0" value="">
+    <span class="count-note">台（0〜20）</span>
+  </div>
+  <div id="rows-wall"><p class="no-data">台数を入力すると測定欄が表示されます</p></div>
+</div>
+<div class="card">
+  <div class="card-hd"><span class="bar bar-fan"></span>ファン</div>
+  <div class="count-row">
+    <span class="lab2">台数</span>
+    <input type="number" class="count-inp" id="cnt-fan" inputmode="numeric" min="0" max="10" placeholder="0" value="">
+    <span class="count-note">台（0〜10）</span>
+  </div>
+  <div id="rows-fan"><p class="no-data">台数を入力すると測定欄が表示されます</p></div>
+</div>
+<div class="err" id="err"></div>
+<button class="calcbtn" id="calc-btn">集計・比較する</button>
+<div id="results">
+  <div id="capture-target">
+    <div class="cap-header" id="cap-header" style="display:none">
+      <div class="ic">Q</div>
+      <div><div class="title-s">風量測定 Q値確認</div><div class="sub-s">吹き出し口・ファン集計</div></div>
+    </div>
+    <div class="cap-info" id="cap-info" style="display:none"></div>
+    <div class="result-card">
+      <div class="result-hd">設計風量</div>
+      <div class="summary-block">
+        <div>
+          <div class="label">設計風量 Q設計</div>
+          <div style="margin-top:4px"><span class="value" id="r-design">—</span><span class="unit-s">m³/h</span></div>
+        </div>
+        <div style="font-size:36px;opacity:.15">🌬</div>
+      </div>
+    </div>
+    <div class="result-card" id="r-gari-card">
+      <div class="result-hd">吹き出し口 集計</div>
+      <table class="res" id="r-gari-table">
+        <thead>
+          <tr>
+            <th style="text-align:left">種別</th>
+            <th>台数</th>
+            <th>合計風量<br><small style="font-weight:400">m³/h</small></th>
+            <th>平均風速<br><small style="font-weight:400">m/s</small></th>
+          </tr>
+        </thead>
+        <tbody id="r-gari-body"></tbody>
+      </table>
+      <div id="r-gari-detail" style="margin-top:6px"></div>
+    </div>
+    <div class="result-card" id="r-fan-card" style="display:none">
+      <div class="result-hd">ファン 集計</div>
+      <table class="res" id="r-fan-table">
+        <thead>
+          <tr>
+            <th style="text-align:left">No.</th>
+            <th>風量<br><small style="font-weight:400">m³/h</small></th>
+          </tr>
+        </thead>
+        <tbody id="r-fan-body"></tbody>
+      </table>
+    </div>
+    <div class="result-card">
+      <div class="result-hd">設計値との比較</div>
+      <div class="compare-block" id="r-compare"></div>
+    </div>
+  </div>
+  <button class="imgbtn" id="img-btn">
+    <span>📷</span><span>結果を画像で保存</span>
+  </button>
+</div>
+<footer>
+  風量測定 Q値確認ツール<br>
+  ※計算結果は参考値です。正式な判定は測定記録をご確認ください。
+</footer>
+</div>
+<div class="modal-overlay" id="modal">
+  <div class="modal-box">
+    <div class="modal-top">
+      <span>📷 画像プレビュー</span>
+      <button class="modal-close" id="modal-close">✕</button>
+    </div>
+    <div class="modal-note">長押し（iPhone）またはドラッグで保存できます</div>
+    <div class="modal-body"><img id="modal-img" src="" alt="結果画像"></div>
+  </div>
+</div>
+<div class="loading-overlay" id="loading">
+  <div class="spinner"></div>
+  <div style="font-size:14px;color:#5a6a82">画像を生成中...</div>
+</div>
+<script>
+(function(){
+"use strict";
+function buildGariTable(type, count){
+  const wrap = document.getElementById('rows-'+type);
+  if(count <= 0){ wrap.innerHTML='<p class="no-data">台数を入力すると測定欄が表示されます</p>'; return; }
+  let html = '<div class="gari-wrap"><table class="gari"><thead><tr>'
+    + '<th>No.</th><th style="text-align:right">風量 Q<br><small>m³/h</small></th>'
+    + '<th style="text-align:right">風速 v<br><small>m/s</small></th>'
+    + '</tr></thead><tbody>';
+  for(let i=1;i<=count;i++){
+    html += `<tr>
+      <td rowspan="2" style="vertical-align:top;padding-top:10px">${i}</td>
+      <td><input type="number" inputmode="decimal" step="1" placeholder="—" class="q-inp" data-no="${i}"></td>
+      <td><input type="number" inputmode="decimal" step="0.01" placeholder="—" class="v-inp" data-no="${i}"></td>
+    </tr>
+    <tr class="loc-row">
+      <td colspan="2" class="loc-cell">
+        <div style="display:flex;align-items:center;gap:5px">
+          <span class="loc-label">📍位置</span>
+          <input type="text" inputmode="text" placeholder="設置位置（任意）例：居室南壁" class="loc-inp" data-no="${i}" style="flex:1">
+        </div>
+      </td>
+    </tr>`;
+  }
+  html += '</tbody></table></div>';
+  wrap.innerHTML = html;
+}
+function buildFanTable(count){
+  const wrap = document.getElementById('rows-fan');
+  if(count <= 0){ wrap.innerHTML='<p class="no-data">台数を入力すると測定欄が表示されます</p>'; return; }
+  let html = '<div class="gari-wrap"><table class="gari"><thead><tr>'
+    + '<th>No.</th><th style="text-align:right">風量 Q<br><small>m³/h</small></th>'
+    + '</tr></thead><tbody>';
+  for(let i=1;i<=count;i++){
+    html += `<tr>
+      <td>${i}</td>
+      <td><input type="number" inputmode="decimal" step="1" placeholder="—" class="fq-inp" data-no="${i}"></td>
+    </tr>`;
+  }
+  html += '</tbody></table></div>';
+  wrap.innerHTML = html;
+}
+['floor','ceil','wall'].forEach(type => {
+  document.getElementById('cnt-'+type).addEventListener('change', function(){
+    const n = Math.min(20, Math.max(0, parseInt(this.value)||0));
+    this.value = n || '';
+    buildGariTable(type, n);
+  });
+});
+document.getElementById('cnt-fan').addEventListener('change', function(){
+  const n = Math.min(10, Math.max(0, parseInt(this.value)||0));
+  this.value = n || '';
+  buildFanTable(n);
+});
+function collectGari(type){
+  const wrap = document.getElementById('rows-'+type);
+  const qInputs = wrap.querySelectorAll('.q-inp');
+  const vInputs = wrap.querySelectorAll('.v-inp');
+  const locInputs = wrap.querySelectorAll('.loc-inp');
+  const rows = [];
+  let totalQ = 0, totalV = 0, vCount = 0;
+  qInputs.forEach((inp, i) => {
+    const q = parseFloat(inp.value);
+    const v = parseFloat(vInputs[i].value);
+    const qVal = isNaN(q) ? null : q;
+    const vVal = isNaN(v) ? null : v;
+    const loc  = locInputs[i] ? locInputs[i].value.trim() : '';
+    rows.push({no: i+1, q: qVal, v: vVal, loc: loc || null});
+    if(qVal !== null) totalQ += qVal;
+    if(vVal !== null){ totalV += vVal; vCount++; }
+  });
+  const avgV = vCount > 0 ? totalV / vCount : null;
+  return {rows, totalQ, avgV, count: qInputs.length};
+}
+function collectFan(){
+  const wrap = document.getElementById('rows-fan');
+  const qInputs = wrap.querySelectorAll('.fq-inp');
+  let totalQ = 0;
+  const rows = [];
+  qInputs.forEach((inp, i) => {
+    const q = parseFloat(inp.value);
+    const qVal = isNaN(q) ? null : q;
+    rows.push({no: i+1, q: qVal});
+    if(qVal !== null) totalQ += qVal;
+  });
+  return {rows, totalQ, count: qInputs.length};
+}
+document.getElementById('calc-btn').addEventListener('click', compute);
+function showErr(m){ const e=document.getElementById('err'); e.textContent=m; e.classList.add('show'); }
+function clearErr(){ document.getElementById('err').classList.remove('show'); }
+function compute(){
+  clearErr();
+  const designQ = parseFloat(document.getElementById('design-q').value);
+  if(!(designQ > 0)){ showErr('設計風量に正しい数値を入力してください。'); return; }
+  const floor = collectGari('floor');
+  const ceil  = collectGari('ceil');
+  const wall  = collectGari('wall');
+  const fan   = collectFan();
+  const gariTotal = floor.totalQ + ceil.totalQ + wall.totalQ;
+  renderResults({designQ, floor, ceil, wall, fan, gariTotal});
+}
+function fmt1(v){ return v === null ? '—' : v.toLocaleString('ja-JP',{minimumFractionDigits:1,maximumFractionDigits:1}); }
+function fmt0(v){ return v === null ? '—' : v.toLocaleString('ja-JP',{maximumFractionDigits:0}); }
+function pctStr(v,d){ return v.toLocaleString('ja-JP',{minimumFractionDigits:d,maximumFractionDigits:d})+'%'; }
+function pctClass(p){ return p>=95&&p<=110?'pct-green': p>=85?'pct-amber':'pct-red'; }
+function badgeClass(p){ return p>=95&&p<=110?'badge-ok': p>=85?'badge-warn':'badge-ng'; }
+function badgeText(p){ return p>=95&&p<=110?'適正': p>=85?'やや不足':'要確認'; }
+function renderResults(r){
+  document.getElementById('r-design').textContent = fmt0(r.designQ);
+  const tbody = document.getElementById('r-gari-body');
+  const types = [
+    {key:'floor', label:'床 吹き出し', color:'var(--floor)', data:r.floor},
+    {key:'ceil',  label:'天井 吹き出し', color:'var(--ceil)', data:r.ceil},
+    {key:'wall',  label:'壁 吹き出し', color:'var(--wall)', data:r.wall},
+  ];
+  let gariHTML = '';
+  types.forEach(t => {
+    if(t.data.count === 0) return;
+    const pBadge = t.data.totalQ > 0
+      ? `<span class="badge ${badgeClass(t.data.totalQ/r.designQ*100)}">${badgeText(t.data.totalQ/r.designQ*100)}</span>`
+      : '';
+    gariHTML += `<tr>
+      <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${t.color};margin-right:5px;vertical-align:middle"></span>${t.label}${pBadge}</td>
+      <td>${t.data.count}</td>
+      <td style="font-weight:700">${fmt0(t.data.totalQ)}</td>
+      <td>${t.data.avgV !== null ? fmt1(t.data.avgV) : '—'}</td>
+    </tr>`;
+  });
+  const gPct = r.designQ > 0 ? r.gariTotal / r.designQ * 100 : 0;
+  gariHTML += `<tr class="subtotal"><td>ガラリ 合計</td><td>—</td><td>${fmt0(r.gariTotal)}</td><td>—</td></tr>`;
+  gariHTML += `<tr class="grand"><td>設計比（ガラリ）<span class="badge ${badgeClass(gPct)}">${badgeText(gPct)}</span></td><td colspan="3" style="text-align:right;font-size:18px">${pctStr(gPct,1)}</td></tr>`;
+  tbody.innerHTML = gariHTML || '<tr><td colspan="4" class="no-data">ガラリの入力がありません</td></tr>';
+  const detailWrap = document.getElementById('r-gari-detail');
+  let detailHTML = '';
+  const typeLabels = [
+    {key:'floor', label:'床 吹き出しガラリ', color:'var(--floor)', data:r.floor},
+    {key:'ceil',  label:'天井 吹き出しガラリ', color:'var(--ceil)',  data:r.ceil},
+    {key:'wall',  label:'壁 吹き出しガラリ',  color:'var(--wall)',  data:r.wall},
+  ];
+  typeLabels.forEach(t => {
+    if(t.data.count === 0) return;
+    let rowsHTML = '';
+    t.data.rows.forEach(row => {
+      rowsHTML += `<tr>
+        <td>${row.no}</td>
+        <td class="loc-td ${row.loc ? '' : 'empty'}">${row.loc || '—'}</td>
+        <td style="font-weight:600">${row.q !== null ? fmt0(row.q) : '—'}</td>
+        <td>${row.v !== null ? fmt1(row.v) : '—'}</td>
+      </tr>`;
+    });
+    detailHTML += `
+      <div class="detail-wrap">
+        <button class="detail-toggle" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.arr').textContent=this.nextElementSibling.classList.contains('open')?'▲':'▼'">
+          <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${t.color};margin-right:6px;vertical-align:middle"></span>${t.label} 詳細</span>
+          <span class="arr">▼</span>
+        </button>
+        <div class="detail-body">
+          <table class="detail">
+            <thead><tr>
+              <th>No.</th><th class="loc-th">設置位置</th>
+              <th>風量<br><small>m³/h</small></th><th>風速<br><small>m/s</small></th>
+            </tr></thead>
+            <tbody>${rowsHTML}</tbody>
+          </table>
+        </div>
+      </div>`;
+  });
+  detailWrap.innerHTML = detailHTML;
+  const fanCard = document.getElementById('r-fan-card');
+  if(r.fan.count > 0){
+    fanCard.style.display = '';
+    const ftbody = document.getElementById('r-fan-body');
+    let fanHTML = '';
+    r.fan.rows.forEach(row => {
+      fanHTML += `<tr><td>ファン ${row.no}</td><td style="font-weight:700">${row.q !== null ? fmt0(row.q) : '—'}</td></tr>`;
+    });
+    const fPct = r.designQ > 0 ? r.fan.totalQ / r.designQ * 100 : 0;
+    fanHTML += `<tr class="subtotal"><td>ファン 合計</td><td>${fmt0(r.fan.totalQ)}</td></tr>`;
+    fanHTML += `<tr class="grand"><td>設計比（ファン）<span class="badge ${badgeClass(fPct)}">${badgeText(fPct)}</span></td><td style="font-size:18px">${pctStr(fPct,1)}</td></tr>`;
+    ftbody.innerHTML = fanHTML;
+  } else {
+    fanCard.style.display = 'none';
+  }
+  const compare = document.getElementById('r-compare');
+  let cHTML = '';
+  if(r.gariTotal > 0) cHTML += compareBar('吹き出し口 合計', r.gariTotal, r.designQ, 'bar-fill-gari');
+  if(r.fan.count > 0 && r.fan.totalQ > 0) cHTML += compareBar('ファン 合計', r.fan.totalQ, r.designQ, 'bar-fill-fan');
+  compare.innerHTML = cHTML || '<p class="no-data">データを入力してください</p>';
+  const resultsEl = document.getElementById('results');
+  resultsEl.classList.add('show');
+  setTimeout(()=>{ resultsEl.scrollIntoView({behavior:'smooth',block:'start'}); }, 100);
+}
+function compareBar(label, actual, design, fillClass){
+  const pct = design > 0 ? actual / design * 100 : 0;
+  const barW = Math.min(pct, 100);
+  const cls = pctClass(pct);
+  return `<div class="compare-row">
+    <div class="compare-label">
+      <span class="name">${label}</span>
+      <span class="pct ${cls}">${pctStr(pct,1)} <span class="badge ${badgeClass(pct)}">${badgeText(pct)}</span></span>
+    </div>
+    <div class="bar-bg"><div class="bar-fill ${fillClass}" style="width:${barW}%"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:3px">
+      <span>実測 ${fmt0(actual)} m³/h</span><span>設計 ${fmt0(design)} m³/h</span>
+    </div>
+  </div>`;
+}
+document.getElementById('img-btn').addEventListener('click', captureImage);
+document.getElementById('modal-close').addEventListener('click', ()=>{
+  document.getElementById('modal').classList.remove('show');
+});
+async function captureImage(){
+  const loading = document.getElementById('loading');
+  loading.classList.add('show');
+  const capHeader = document.getElementById('cap-header');
+  const capInfo   = document.getElementById('cap-info');
+  capHeader.style.display = 'flex';
+  const siteName = document.getElementById('site-name').value;
+  const measDate = document.getElementById('meas-date').value;
+  const memo     = document.getElementById('memo').value;
+  let infoHTML = '';
+  if(siteName) infoHTML += `<span>📍 <b>${siteName}</b></span>`;
+  if(measDate) infoHTML += `<span>📅 <b>${measDate}</b></span>`;
+  if(memo)     infoHTML += `<span>📝 ${memo}</span>`;
+  if(infoHTML){ capInfo.innerHTML = infoHTML; capInfo.style.display = 'flex'; }
+  await new Promise(r => setTimeout(r, 100));
+  try {
+    const target = document.getElementById('capture-target');
+    const canvas = await html2canvas(target, {
+      scale: 2, useCORS: true, backgroundColor: '#f0f4f9', logging: false,
+    });
+    capHeader.style.display = 'none';
+    capInfo.style.display   = 'none';
+    const imgUrl = canvas.toDataURL('image/png');
+    document.getElementById('modal-img').src = imgUrl;
+    document.getElementById('modal').classList.add('show');
+  } catch(e) {
+    capHeader.style.display = 'none';
+    capInfo.style.display   = 'none';
+    alert('画像の生成に失敗しました。');
+  } finally {
+    loading.classList.remove('show');
+  }
+}
+})();
+</script>
+</body>
+</html>
