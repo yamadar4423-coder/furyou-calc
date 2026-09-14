@@ -89,29 +89,18 @@ input:focus{outline:none;border-color:var(--blue);background:#fff}
 }
 .count-inp:focus{outline:none;border-color:var(--blue)}
 .count-note{font-size:12px;color:var(--muted)}
-.gari-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-table.gari{width:100%;border-collapse:collapse;min-width:280px}
-table.gari th{
-  font-size:11.5px;color:var(--muted);font-weight:600;
-  padding:0 5px 8px;text-align:right;white-space:nowrap;
+.grid-note{font-size:11.5px;color:var(--muted);font-weight:600;margin-bottom:6px}
+.q-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.q-cell{display:flex;align-items:center;gap:6px}
+.q-no{min-width:22px;text-align:right;font-size:13px;font-weight:700;color:var(--muted)}
+.q-grid input[type="number"]{padding:9px 8px;text-align:right}
+.clearbtn{
+  width:100%;margin-top:20px;padding:12px;border:1px solid var(--line);
+  border-radius:12px;background:transparent;color:var(--red);
+  font-size:14px;font-weight:700;cursor:pointer;
 }
-table.gari th:first-child{text-align:center;width:28px}
-table.gari td{padding:0 3px 8px;vertical-align:middle}
-table.gari td:first-child{text-align:center;color:var(--muted);font-size:13px;font-weight:700}
-table.gari input[type="number"]{font-size:15px;padding:9px 8px;text-align:right}
-tr.loc-row td{padding:0 3px 10px}
-tr.loc-row td:first-child{border-bottom:1.5px dashed var(--line)}
-tr.loc-row .loc-cell{padding-bottom:10px;border-bottom:1.5px dashed var(--line)}
-table.gari input[type="text"].loc-inp{
-  font-size:13px;padding:7px 9px;color:var(--ink);
-  border-color:#e2eaf5;background:#f5f8fc;border-radius:8px;
-}
-table.gari input[type="text"].loc-inp:focus{border-color:var(--blue);background:#fff}
-table.gari input[type="text"].loc-inp::placeholder{color:#a0adc0}
-.loc-label{
-  font-size:11px;color:var(--muted);font-weight:600;
-  white-space:nowrap;padding-right:4px;line-height:36px;
-}
+.clearbtn:active{background:#fdeded}
+.save-note{font-size:11.5px;color:var(--muted);text-align:center;margin-top:6px}
 .detail-wrap{margin-top:10px}
 .detail-toggle{
   width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:10px;
@@ -127,11 +116,8 @@ table.detail th{
   padding:0 6px 6px;border-bottom:1px solid var(--line);text-align:right;
 }
 table.detail th:first-child{text-align:center;width:28px}
-table.detail th.loc-th{text-align:left}
 table.detail td{padding:6px 6px;border-bottom:1px solid #f0f4f9;text-align:right;vertical-align:middle}
 table.detail td:first-child{text-align:center;color:var(--muted);font-weight:700}
-table.detail td.loc-td{text-align:left;color:var(--ink);font-size:12px;max-width:120px;word-break:break-all}
-table.detail td.loc-td.empty{color:#b0bac8;font-style:italic}
 .total-row td{
   padding-top:6px;border-top:1px solid var(--line);
   font-size:13px;color:var(--muted);font-weight:600;
@@ -348,8 +334,8 @@ footer{text-align:center;color:var(--muted);font-size:11.5px;margin-top:20px;lin
   <div class="card-hd"><span class="bar bar-fan"></span>ファン</div>
   <div class="count-row">
     <span class="lab2">台数</span>
-    <input type="number" class="count-inp" id="cnt-fan" inputmode="numeric" min="0" max="10" placeholder="0" value="">
-    <span class="count-note">台（0〜10）</span>
+    <input type="number" class="count-inp" id="cnt-fan" inputmode="numeric" min="0" max="50" placeholder="0" value="">
+    <span class="count-note">台（0〜50）</span>
   </div>
   <div id="rows-fan"><p class="no-data">台数を入力すると測定欄が表示されます</p></div>
 </div>
@@ -380,7 +366,6 @@ footer{text-align:center;color:var(--muted);font-size:11.5px;margin-top:20px;lin
             <th style="text-align:left">種別</th>
             <th>台数</th>
             <th>合計風量<br><small style="font-weight:400">m³/h</small></th>
-            <th>平均風速<br><small style="font-weight:400">m/s</small></th>
           </tr>
         </thead>
         <tbody id="r-gari-body"></tbody>
@@ -408,6 +393,8 @@ footer{text-align:center;color:var(--muted);font-size:11.5px;margin-top:20px;lin
     <span>📷</span><span>結果を画像で保存</span>
   </button>
 </div>
+<button class="clearbtn" id="clear-btn">入力をすべてクリア</button>
+<p class="save-note">入力内容はこの端末に自動保存されます</p>
 <footer>
   風量測定 Q値確認ツール<br>
   ※計算結果は参考値です。正式な判定は測定記録をご確認ください。
@@ -430,91 +417,82 @@ footer{text-align:center;color:var(--muted);font-size:11.5px;margin-top:20px;lin
 <script>
 (function(){
 "use strict";
-function buildGariTable(type, count){
+const TYPES = ['floor','ceil','wall','fan'];
+const MAX = {floor:20, ceil:20, wall:20, fan:50};
+const FIELDS = ['site-name','meas-date','memo','design-q'];
+const STORE_KEY = 'furyou-calc-v1';
+function getValues(type){
+  return Array.from(document.querySelectorAll('#rows-'+type+' .q-inp')).map(inp => inp.value);
+}
+// 台数変更時も入力済みの値は残す
+function buildRows(type, count, values){
   const wrap = document.getElementById('rows-'+type);
+  const prev = values || getValues(type);
   if(count <= 0){ wrap.innerHTML='<p class="no-data">台数を入力すると測定欄が表示されます</p>'; return; }
-  let html = '<div class="gari-wrap"><table class="gari"><thead><tr>'
-    + '<th>No.</th><th style="text-align:right">風量 Q<br><small>m³/h</small></th>'
-    + '<th style="text-align:right">風速 v<br><small>m/s</small></th>'
-    + '</tr></thead><tbody>';
+  let html = '<p class="grid-note">風量 Q（m³/h）</p><div class="q-grid">';
   for(let i=1;i<=count;i++){
-    html += `<tr>
-      <td rowspan="2" style="vertical-align:top;padding-top:10px">${i}</td>
-      <td><input type="number" inputmode="decimal" step="1" placeholder="—" class="q-inp" data-no="${i}"></td>
-      <td><input type="number" inputmode="decimal" step="0.01" placeholder="—" class="v-inp" data-no="${i}"></td>
-    </tr>
-    <tr class="loc-row">
-      <td colspan="2" class="loc-cell">
-        <div style="display:flex;align-items:center;gap:5px">
-          <span class="loc-label">📍位置</span>
-          <input type="text" inputmode="text" placeholder="設置位置（任意）例：居室南壁" class="loc-inp" data-no="${i}" style="flex:1">
-        </div>
-      </td>
-    </tr>`;
+    html += `<label class="q-cell"><span class="q-no">${i}</span><input type="number" inputmode="decimal" step="1" enterkeyhint="next" placeholder="—" class="q-inp"></label>`;
   }
-  html += '</tbody></table></div>';
+  html += '</div>';
   wrap.innerHTML = html;
+  wrap.querySelectorAll('.q-inp').forEach((inp, i) => { if(prev[i] != null) inp.value = prev[i]; });
 }
-function buildFanTable(count){
-  const wrap = document.getElementById('rows-fan');
-  if(count <= 0){ wrap.innerHTML='<p class="no-data">台数を入力すると測定欄が表示されます</p>'; return; }
-  let html = '<div class="gari-wrap"><table class="gari"><thead><tr>'
-    + '<th>No.</th><th style="text-align:right">風量 Q<br><small>m³/h</small></th>'
-    + '</tr></thead><tbody>';
-  for(let i=1;i<=count;i++){
-    html += `<tr>
-      <td>${i}</td>
-      <td><input type="number" inputmode="decimal" step="1" placeholder="—" class="fq-inp" data-no="${i}"></td>
-    </tr>`;
-  }
-  html += '</tbody></table></div>';
-  wrap.innerHTML = html;
-}
-['floor','ceil','wall'].forEach(type => {
+TYPES.forEach(type => {
   document.getElementById('cnt-'+type).addEventListener('change', function(){
-    const n = Math.min(20, Math.max(0, parseInt(this.value)||0));
+    const n = Math.min(MAX[type], Math.max(0, parseInt(this.value)||0));
     this.value = n || '';
-    buildGariTable(type, n);
+    buildRows(type, n);
+    save();
   });
 });
-document.getElementById('cnt-fan').addEventListener('change', function(){
-  const n = Math.min(10, Math.max(0, parseInt(this.value)||0));
-  this.value = n || '';
-  buildFanTable(n);
+// Enterで次の風量欄へ
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Enter' || !e.target.classList.contains('q-inp')) return;
+  e.preventDefault();
+  const all = Array.from(document.querySelectorAll('.q-inp'));
+  const next = all[all.indexOf(e.target) + 1];
+  if(next) next.focus(); else e.target.blur();
 });
-function collectGari(type){
-  const wrap = document.getElementById('rows-'+type);
-  const qInputs = wrap.querySelectorAll('.q-inp');
-  const vInputs = wrap.querySelectorAll('.v-inp');
-  const locInputs = wrap.querySelectorAll('.loc-inp');
+function collect(type){
   const rows = [];
-  let totalQ = 0, totalV = 0, vCount = 0;
-  qInputs.forEach((inp, i) => {
-    const q = parseFloat(inp.value);
-    const v = parseFloat(vInputs[i].value);
-    const qVal = isNaN(q) ? null : q;
-    const vVal = isNaN(v) ? null : v;
-    const loc  = locInputs[i] ? locInputs[i].value.trim() : '';
-    rows.push({no: i+1, q: qVal, v: vVal, loc: loc || null});
-    if(qVal !== null) totalQ += qVal;
-    if(vVal !== null){ totalV += vVal; vCount++; }
-  });
-  const avgV = vCount > 0 ? totalV / vCount : null;
-  return {rows, totalQ, avgV, count: qInputs.length};
-}
-function collectFan(){
-  const wrap = document.getElementById('rows-fan');
-  const qInputs = wrap.querySelectorAll('.fq-inp');
   let totalQ = 0;
-  const rows = [];
-  qInputs.forEach((inp, i) => {
-    const q = parseFloat(inp.value);
+  getValues(type).forEach((s, i) => {
+    const q = parseFloat(s);
     const qVal = isNaN(q) ? null : q;
     rows.push({no: i+1, q: qVal});
     if(qVal !== null) totalQ += qVal;
   });
-  return {rows, totalQ, count: qInputs.length};
+  return {rows, totalQ, count: rows.length};
 }
+function save(){
+  const data = {fields:{}, rows:{}};
+  FIELDS.forEach(id => { data.fields[id] = document.getElementById(id).value; });
+  TYPES.forEach(t => { data.rows[t] = getValues(t); });
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(data)); }catch(e){}
+}
+function restore(){
+  let data = null;
+  try{ data = JSON.parse(localStorage.getItem(STORE_KEY)); }catch(e){}
+  if(!data) return;
+  FIELDS.forEach(id => { if(data.fields && data.fields[id] != null) document.getElementById(id).value = data.fields[id]; });
+  TYPES.forEach(t => {
+    const vals = (data.rows && data.rows[t]) || [];
+    const n = Math.min(MAX[t], vals.length);
+    document.getElementById('cnt-'+t).value = n || '';
+    buildRows(t, n, vals);
+  });
+}
+document.addEventListener('input', save);
+document.getElementById('clear-btn').addEventListener('click', () => {
+  if(!confirm('入力内容をすべて消去します。よろしいですか？')) return;
+  FIELDS.forEach(id => { document.getElementById(id).value = ''; });
+  TYPES.forEach(t => { document.getElementById('cnt-'+t).value = ''; buildRows(t, 0); });
+  document.getElementById('results').classList.remove('show');
+  clearErr();
+  try{ localStorage.removeItem(STORE_KEY); }catch(e){}
+  window.scrollTo({top:0, behavior:'smooth'});
+});
+restore();
 document.getElementById('calc-btn').addEventListener('click', compute);
 function showErr(m){ const e=document.getElementById('err'); e.textContent=m; e.classList.add('show'); }
 function clearErr(){ document.getElementById('err').classList.remove('show'); }
@@ -522,10 +500,10 @@ function compute(){
   clearErr();
   const designQ = parseFloat(document.getElementById('design-q').value);
   if(!(designQ > 0)){ showErr('設計風量に正しい数値を入力してください。'); return; }
-  const floor = collectGari('floor');
-  const ceil  = collectGari('ceil');
-  const wall  = collectGari('wall');
-  const fan   = collectFan();
+  const floor = collect('floor');
+  const ceil  = collect('ceil');
+  const wall  = collect('wall');
+  const fan   = collect('fan');
   const gariTotal = floor.totalQ + ceil.totalQ + wall.totalQ;
   renderResults({designQ, floor, ceil, wall, fan, gariTotal});
 }
@@ -553,13 +531,12 @@ function renderResults(r){
       <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${t.color};margin-right:5px;vertical-align:middle"></span>${t.label}${pBadge}</td>
       <td>${t.data.count}</td>
       <td style="font-weight:700">${fmt0(t.data.totalQ)}</td>
-      <td>${t.data.avgV !== null ? fmt1(t.data.avgV) : '—'}</td>
     </tr>`;
   });
   const gPct = r.designQ > 0 ? r.gariTotal / r.designQ * 100 : 0;
-  gariHTML += `<tr class="subtotal"><td>ガラリ 合計</td><td>—</td><td>${fmt0(r.gariTotal)}</td><td>—</td></tr>`;
-  gariHTML += `<tr class="grand"><td>設計比（ガラリ）<span class="badge ${badgeClass(gPct)}">${badgeText(gPct)}</span></td><td colspan="3" style="text-align:right;font-size:18px">${pctStr(gPct,1)}</td></tr>`;
-  tbody.innerHTML = gariHTML || '<tr><td colspan="4" class="no-data">ガラリの入力がありません</td></tr>';
+  gariHTML += `<tr class="subtotal"><td>ガラリ 合計</td><td>${r.floor.count + r.ceil.count + r.wall.count}</td><td>${fmt0(r.gariTotal)}</td></tr>`;
+  gariHTML += `<tr class="grand"><td>設計比（ガラリ）<span class="badge ${badgeClass(gPct)}">${badgeText(gPct)}</span></td><td colspan="2" style="text-align:right;font-size:18px">${pctStr(gPct,1)}</td></tr>`;
+  tbody.innerHTML = gariHTML;
   const detailWrap = document.getElementById('r-gari-detail');
   let detailHTML = '';
   const typeLabels = [
@@ -573,9 +550,7 @@ function renderResults(r){
     t.data.rows.forEach(row => {
       rowsHTML += `<tr>
         <td>${row.no}</td>
-        <td class="loc-td ${row.loc ? '' : 'empty'}">${row.loc || '—'}</td>
         <td style="font-weight:600">${row.q !== null ? fmt0(row.q) : '—'}</td>
-        <td>${row.v !== null ? fmt1(row.v) : '—'}</td>
       </tr>`;
     });
     detailHTML += `
@@ -587,8 +562,7 @@ function renderResults(r){
         <div class="detail-body">
           <table class="detail">
             <thead><tr>
-              <th>No.</th><th class="loc-th">設置位置</th>
-              <th>風量<br><small>m³/h</small></th><th>風速<br><small>m/s</small></th>
+              <th>No.</th><th>風量<br><small>m³/h</small></th>
             </tr></thead>
             <tbody>${rowsHTML}</tbody>
           </table>
