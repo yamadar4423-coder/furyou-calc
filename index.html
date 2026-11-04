@@ -93,7 +93,7 @@ input:focus{outline:none;border-color:var(--blue);background:#fff}
 .q-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
 .q-cell{display:flex;align-items:center;gap:6px}
 .q-no{min-width:22px;text-align:right;font-size:13px;font-weight:700;color:var(--muted)}
-.q-grid input[type="number"]{padding:9px 8px;text-align:right}
+.q-grid input[type="text"]{padding:9px 8px;text-align:right}
 .clearbtn{
   width:100%;margin-top:20px;padding:12px;border:1px solid var(--line);
   border-radius:12px;background:transparent;color:var(--red);
@@ -138,6 +138,11 @@ table.detail td:first-child{text-align:center;color:var(--muted);font-weight:700
   border-radius:12px;padding:10px 13px;font-size:13.5px;margin:8px 0;display:none;
 }
 .err.show{display:block}
+.warn{
+  background:#fff6e0;border:1px solid #edd08a;color:#7a5200;
+  border-radius:12px;padding:10px 13px;font-size:13.5px;margin:0 0 10px;display:none;
+}
+.warn.show{display:block}
 #results{display:none}
 #results.show{display:block}
 .result-card{
@@ -298,7 +303,7 @@ footer{text-align:center;color:var(--muted);font-size:11.5px;margin-top:20px;lin
   <label class="field" style="margin-bottom:0">
     <span class="lab">設計風量 Q設計 <small>（系統全体）</small></span>
     <div class="unit-row">
-      <input type="number" id="design-q" inputmode="decimal" step="1" placeholder="例：3600">
+      <input type="text" id="design-q" inputmode="decimal" autocomplete="off" placeholder="例：3600">
       <span class="unit">m³/h</span>
     </div>
   </label>
@@ -348,6 +353,7 @@ footer{text-align:center;color:var(--muted);font-size:11.5px;margin-top:20px;lin
       <div><div class="title-s">風量測定 Q値確認</div><div class="sub-s">吹き出し口・ファン集計</div></div>
     </div>
     <div class="cap-info" id="cap-info" style="display:none"></div>
+    <div class="warn" id="r-warn"></div>
     <div class="result-card">
       <div class="result-hd">設計風量</div>
       <div class="summary-block">
@@ -431,7 +437,7 @@ function buildRows(type, count, values){
   if(count <= 0){ wrap.innerHTML='<p class="no-data">台数を入力すると測定欄が表示されます</p>'; return; }
   let html = '<p class="grid-note">風量 Q（m³/h）</p><div class="q-grid">';
   for(let i=1;i<=count;i++){
-    html += `<label class="q-cell"><span class="q-no">${i}</span><input type="number" inputmode="decimal" step="1" enterkeyhint="next" placeholder="—" class="q-inp"></label>`;
+    html += `<label class="q-cell"><span class="q-no">${i}</span><input type="text" inputmode="decimal" autocomplete="off" enterkeyhint="next" placeholder="—" class="q-inp"></label>`;
   }
   html += '</div>';
   wrap.innerHTML = html;
@@ -453,16 +459,27 @@ document.addEventListener('keydown', e => {
   const next = all[all.indexOf(e.target) + 1];
   if(next) next.focus(); else e.target.blur();
 });
+// 入力の文字を数にする。空欄は null、数として読めないものは NaN。
+// 全角と3桁区切りのコンマは読むが、「12,5」のような形は 125 や 12 と決めつけず NaN にする。
+function parseNum(s){
+  const t = String(s).trim()
+    .replace(/[０-９．，]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[－−ー]/g, '-');
+  if(t === '') return null;
+  if(!/^-?(\d+(\.\d+)?|\.\d+|\d{1,3}(,\d{3})+(\.\d+)?)$/.test(t)) return NaN;
+  const v = parseFloat(t.replace(/,/g, ''));
+  return isFinite(v) ? v : NaN;
+}
 function collect(type){
   const rows = [];
   let totalQ = 0;
   getValues(type).forEach((s, i) => {
-    const q = parseFloat(s);
-    const qVal = isNaN(q) ? null : q;
-    rows.push({no: i+1, q: qVal});
-    if(qVal !== null) totalQ += qVal;
+    const q = parseNum(s);
+    rows.push({no: i+1, q});
+    if(q !== null && !isNaN(q)) totalQ += q;
   });
-  return {rows, totalQ, count: rows.length};
+  const filled = rows.filter(row => row.q !== null).length;
+  return {rows, totalQ, count: rows.length, filled};
 }
 function save(){
   const data = {fields:{}, rows:{}};
@@ -496,25 +513,55 @@ restore();
 document.getElementById('calc-btn').addEventListener('click', compute);
 function showErr(m){ const e=document.getElementById('err'); e.textContent=m; e.classList.add('show'); }
 function clearErr(){ document.getElementById('err').classList.remove('show'); }
+// 場所の一覧。長くなりすぎないよう先頭だけ出す
+function placeList(places){
+  const head = places.slice(0, 10).join('、');
+  return places.length > 10 ? head+' ほか' : head;
+}
 function compute(){
   clearErr();
-  const designQ = parseFloat(document.getElementById('design-q').value);
-  if(!(designQ > 0)){ showErr('設計風量に正しい数値を入力してください。'); return; }
+  const resultsEl = document.getElementById('results');
+  const designQ = parseNum(document.getElementById('design-q').value);
+  if(!(designQ > 0)){
+    resultsEl.classList.remove('show');
+    showErr('設計風量に正しい数値を入力してください。');
+    return;
+  }
   const floor = collect('floor');
   const ceil  = collect('ceil');
   const wall  = collect('wall');
   const fan   = collect('fan');
-  // 測った風量は負にならない。合計から黙って引かないよう、打ち間違いとして止める
-  const negatives = [['床',floor],['天井',ceil],['壁',wall],['ファン',fan]]
-    .flatMap(([label,d]) => d.rows.filter(row => row.q !== null && row.q < 0).map(row => label+' '+row.no));
-  if(negatives.length){
-    document.getElementById('results').classList.remove('show');
-    showErr('風量は 0 以上で入力してください（'+negatives.join('、')+'）。');
+  const groups = [['床',floor],['天井',ceil],['壁',wall],['ファン',fan]];
+  const placesWhere = test => groups.flatMap(([label,d]) => d.rows.filter(row => test(row.q)).map(row => label+' '+row.no));
+  // 読めない入力は別の数に読み替えず止める（12,5 → 125 や 12 にしない）
+  const unreadable = placesWhere(q => q !== null && isNaN(q));
+  if(unreadable.length){
+    resultsEl.classList.remove('show');
+    showErr('数値として読めない欄があります（'+placeList(unreadable)+'）。小数は「12.5」のように点で入力してください。');
     return;
+  }
+  // 測った風量は負にならない。合計から黙って引かないよう、打ち間違いとして止める
+  const negatives = placesWhere(q => q !== null && q < 0);
+  if(negatives.length){
+    resultsEl.classList.remove('show');
+    showErr('風量は 0 以上で入力してください（'+placeList(negatives)+'）。');
+    return;
+  }
+  // 空欄は測定の途中かもしれないので止めない。ただし測り忘れに気づけるよう結果の先頭に出す
+  const blanks = placesWhere(q => q === null);
+  const warnEl = document.getElementById('r-warn');
+  if(blanks.length){
+    warnEl.textContent = '未入力が '+blanks.length+' か所あります（'+placeList(blanks)+'）。合計と設計比は入力済みの分だけで計算しています。';
+    warnEl.classList.add('show');
+  } else {
+    warnEl.textContent = '';
+    warnEl.classList.remove('show');
   }
   const gariTotal = floor.totalQ + ceil.totalQ + wall.totalQ;
   renderResults({designQ, floor, ceil, wall, fan, gariTotal});
 }
+// 台数の表示。空欄があるときだけ「入力済み/設定台数」
+function countStr(filled, count){ return filled === count ? String(count) : filled+'/'+count; }
 function fmt1(v){ return v === null ? '—' : v.toLocaleString('ja-JP',{minimumFractionDigits:1,maximumFractionDigits:1}); }
 function fmt0(v){ return v === null ? '—' : v.toLocaleString('ja-JP',{maximumFractionDigits:0}); }
 function pctStr(v,d){ return v.toLocaleString('ja-JP',{minimumFractionDigits:d,maximumFractionDigits:d})+'%'; }
@@ -536,12 +583,12 @@ function renderResults(r){
     if(t.data.count === 0) return;
     gariHTML += `<tr>
       <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${t.color};margin-right:5px;vertical-align:middle"></span>${t.label}</td>
-      <td>${t.data.count}</td>
+      <td>${countStr(t.data.filled, t.data.count)}</td>
       <td style="font-weight:700">${fmt0(t.data.totalQ)}</td>
     </tr>`;
   });
   const gPct = r.designQ > 0 ? r.gariTotal / r.designQ * 100 : 0;
-  gariHTML += `<tr class="subtotal"><td>ガラリ 合計</td><td>${r.floor.count + r.ceil.count + r.wall.count}</td><td>${fmt0(r.gariTotal)}</td></tr>`;
+  gariHTML += `<tr class="subtotal"><td>ガラリ 合計</td><td>${countStr(r.floor.filled + r.ceil.filled + r.wall.filled, r.floor.count + r.ceil.count + r.wall.count)}</td><td>${fmt0(r.gariTotal)}</td></tr>`;
   gariHTML += `<tr class="grand"><td>設計比（ガラリ）<span class="badge ${badgeClass(gPct)}">${badgeText(gPct)}</span></td><td colspan="2" style="text-align:right;font-size:18px">${pctStr(gPct,1)}</td></tr>`;
   tbody.innerHTML = gariHTML;
   const detailWrap = document.getElementById('r-gari-detail');
