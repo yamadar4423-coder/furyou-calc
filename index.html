@@ -510,9 +510,11 @@ function compute(){
 function fmt1(v){ return v === null ? '—' : v.toLocaleString('ja-JP',{minimumFractionDigits:1,maximumFractionDigits:1}); }
 function fmt0(v){ return v === null ? '—' : v.toLocaleString('ja-JP',{maximumFractionDigits:0}); }
 function pctStr(v,d){ return v.toLocaleString('ja-JP',{minimumFractionDigits:d,maximumFractionDigits:d})+'%'; }
-function pctClass(p){ return p>=95&&p<=110?'pct-green': p>=85?'pct-amber':'pct-red'; }
-function badgeClass(p){ return p>=95&&p<=110?'badge-ok': p>=85?'badge-warn':'badge-ng'; }
-function badgeText(p){ return p>=95&&p<=110?'適正': p>=85?'やや不足':'要確認'; }
+// 判定は画面に出す小数1桁の値で行う（110.00000000000001% のような計算誤差で外れないように）
+function judgeValue(p){ return Math.round(p*10)/10; }
+function pctClass(p){ const v=judgeValue(p); return v>110?'pct-amber': v>=95?'pct-green': v>=85?'pct-amber':'pct-red'; }
+function badgeClass(p){ const v=judgeValue(p); return v>110?'badge-warn': v>=95?'badge-ok': v>=85?'badge-warn':'badge-ng'; }
+function badgeText(p){ const v=judgeValue(p); return v>110?'過大': v>=95?'適正': v>=85?'やや不足':'要確認'; }
 function renderResults(r){
   document.getElementById('r-design').textContent = fmt0(r.designQ);
   const tbody = document.getElementById('r-gari-body');
