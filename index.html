@@ -504,6 +504,14 @@ function compute(){
   const ceil  = collect('ceil');
   const wall  = collect('wall');
   const fan   = collect('fan');
+  // 測った風量は負にならない。合計から黙って引かないよう、打ち間違いとして止める
+  const negatives = [['床',floor],['天井',ceil],['壁',wall],['ファン',fan]]
+    .flatMap(([label,d]) => d.rows.filter(row => row.q !== null && row.q < 0).map(row => label+' '+row.no));
+  if(negatives.length){
+    document.getElementById('results').classList.remove('show');
+    showErr('風量は 0 以上で入力してください（'+negatives.join('、')+'）。');
+    return;
+  }
   const gariTotal = floor.totalQ + ceil.totalQ + wall.totalQ;
   renderResults({designQ, floor, ceil, wall, fan, gariTotal});
 }
@@ -526,11 +534,8 @@ function renderResults(r){
   let gariHTML = '';
   types.forEach(t => {
     if(t.data.count === 0) return;
-    const pBadge = t.data.totalQ > 0
-      ? `<span class="badge ${badgeClass(t.data.totalQ/r.designQ*100)}">${badgeText(t.data.totalQ/r.designQ*100)}</span>`
-      : '';
     gariHTML += `<tr>
-      <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${t.color};margin-right:5px;vertical-align:middle"></span>${t.label}${pBadge}</td>
+      <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${t.color};margin-right:5px;vertical-align:middle"></span>${t.label}</td>
       <td>${t.data.count}</td>
       <td style="font-weight:700">${fmt0(t.data.totalQ)}</td>
     </tr>`;
