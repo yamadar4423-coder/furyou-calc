@@ -303,7 +303,7 @@ footer{text-align:center;color:var(--muted);font-size:11.5px;margin-top:20px;lin
   <label class="field" style="margin-bottom:0">
     <span class="lab">設計風量 Q設計 <small>（系統全体）</small></span>
     <div class="unit-row">
-      <input type="text" id="design-q" data-calc autocomplete="off" placeholder="例：3600">
+      <input type="text" id="design-q" inputmode="decimal" data-calc autocomplete="off" placeholder="例：3600">
       <span class="unit">m³/h</span>
     </div>
   </label>
@@ -570,7 +570,7 @@ function buildRows(type, count, values){
   if(count <= 0){ wrap.innerHTML='<p class="no-data">台数を入力すると測定欄が表示されます</p>'; return; }
   let html = '<p class="grid-note">風量 Q（m³/h）</p><div class="q-grid">';
   for(let i=1;i<=count;i++){
-    html += `<label class="q-cell"><span class="q-no">${i}</span><input type="text" data-calc autocomplete="off" enterkeyhint="next" placeholder="—" class="q-inp"></label>`;
+    html += `<label class="q-cell"><span class="q-no">${i}</span><input type="text" inputmode="decimal" data-calc autocomplete="off" enterkeyhint="next" placeholder="—" class="q-inp"></label>`;
   }
   html += '</div>';
   wrap.innerHTML = html;

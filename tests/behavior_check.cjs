@@ -85,6 +85,6 @@ for(const bad of ['12,5','1.2.3','1e3']){
  a.set('floor',['12,5']);a.calc();
  check('読めない入力に直すと前の結果を消す',!a.el('results').classList.contains('show'));}
 // 検査の前提：実際の入力欄が文字をそのまま渡す形か（数値欄だとブラウザが先に書き換える）
-check('風量欄と設計風量は文字の欄',/<input type="text" data-calc[^>]*class="q-inp"/.test(html)&&/<input type="text" id="design-q" data-calc/.test(html));
+check('風量欄と設計風量は文字の欄',/<input type="text" inputmode="decimal" data-calc[^>]*class="q-inp"/.test(html)&&/<input type="text" id="design-q" inputmode="decimal" data-calc/.test(html));
 
 if(ng){console.log(`不合格 ${ng}件`);process.exit(1);}console.log('合格');
